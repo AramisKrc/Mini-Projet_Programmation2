@@ -1,0 +1,448 @@
+Grille.h :
+#ifndef GRILLE_H
+#define GRILLE_H
+
+typedef struct {
+    unsigned int n; // Number of rows
+    unsigned int m; // Number of columns
+    char **tableau; // 2D array of characters
+    unsigned int fruit_x; // X-coordinate of the fruit
+    unsigned int fruit_y; // Y-coordinate of the fruit
+} Grille;
+
+Grille* Grille_allouer(unsigned int n, unsigned int m);
+void Grille_vider(Grille *grille);
+void Grille_tirage_fruit(Grille *grille);
+void Grille_remplir(Grille *grille, unsigned int snake_x, unsigned int snake_y, unsigned int snake_size);
+void Grille_desallouer(Grille *grille);
+void Grille_redessiner(Grille *grille);
+
+#endif /* GRILLE_H */
+
+Grille.c:
+#include "Grille.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include "serpent.h"
+
+Grille* Grille_allouer(unsigned int n, unsigned int m) {
+    Grille *grille = malloc(sizeof(Grille));
+    if (grille == NULL) {
+        return NULL; // Memory allocation failed
+    }
+
+    grille->n = n;
+    grille->m = m;
+    grille->tableau = malloc(n * sizeof(char *));
+    if (grille->tableau == NULL) {
+        free(grille);
+        return NULL; // Memory allocation failed
+    }
+
+    // Allocate memory for each row
+    for (unsigned int i = 0; i < n; i++) {
+        grille->tableau[i] = malloc(m * sizeof(char));
+        if (grille->tableau[i] == NULL) {
+            // Free previously allocated memory
+            for (unsigned int j = 0; j < i; j++) {
+                free(grille->tableau[j]);
+            }
+            free(grille->tableau);
+            free(grille);
+            return NULL; // Memory allocation failed
+        }
+    }
+
+    Grille_vider(grille);
+    Grille_tirage_fruit(grille);
+    return grille;
+}
+
+void Grille_vider(Grille *grille) {
+    for (unsigned int i = 0; i < grille->n; i++) {
+        for (unsigned int j = 0; j < grille->m; j++) {
+            grille->tableau[i][j] = ' ';
+        }
+    }
+}
+
+void Grille_tirage_fruit(Grille *grille) {
+    srand(time(NULL));
+    grille->fruit_x = rand() % grille->n;
+    grille->fruit_y = rand() % grille->m;
+}
+
+void Grille_remplir(Grille *grille, unsigned int snake_x, unsigned int snake_y, unsigned int snake_size) {
+    Grille_vider(grille);
+    grille->tableau[grille->fruit_x][grille->fruit_y] = 'F'; // Place the fruit
+
+    // Place the snake's head
+    grille->tableau[snake_x][snake_y] = 'S';
+
+    // Fill the grid with the snake's body sections
+    for (unsigned int i = 1; i < snake_size; i++) {
+        unsigned int new_x = snake_x;
+        unsigned int new_y = snake_y + i; // Adjust the y-coordinate for the body section
+
+        // Check if the new coordinates are within the grid boundaries
+        if (new_x < grille->n && new_y < grille->m) {
+            grille->tableau[new_x][new_y] = 'S';
+        }
+    }
+}
+
+
+
+
+
+void Grille_desallouer(Grille *grille) {
+    for (unsigned int i = 0; i < grille->n; i++) {
+        free(grille->tableau[i]);
+    }
+    free(grille->tableau);
+    free(grille);
+}
+
+void Grille_redessiner(Grille *grille) {
+    printf("\033[2J"); // Clear terminal
+    printf("\033[H");  // Move cursor to top-left corner
+
+    // Print top border
+    printf("\033[47m"); // White background color
+    for (unsigned int j = 0; j < grille->m *2 +2 ; j++) {
+        printf(" ");
+    }
+    printf("\033[0m\n"); // Reset colors
+
+    // Print the grid with the fruit marked
+    for (unsigned int i = 0; i < grille->n; i++) {
+        // Print left border
+        printf("\033[47m "); // White background color for left border
+        // Print grid contents
+        for (unsigned int j = 0; j < grille->m; j++) {
+            if (i == grille->fruit_x && j == grille->fruit_y) {
+                printf("\U0001F34E"); // Emoji for fruit
+            } else if (grille->tableau[i][j] == 'S') {
+                printf("\033[32m"); // Green color for the snake
+                printf("\u25A0 "); // Print snake character
+            } else {
+                printf("\033[40m"); // Black background color for the interior
+                printf("  "); // Print interior
+            }
+        }
+        // Print right border
+        printf("\033[47m \033[0m\n"); // White background color for right border
+    }
+
+    // Print bottom border
+    printf("\033[47m"); // White background color
+    for (unsigned int j = 0; j < grille->m * 2 +2; j++) {
+        printf(" ");
+    }
+    printf("\033[0m\n"); // Reset colors
+    printf("\n");
+}
+
+
+Jeu.h :
+#ifndef FONCTIONS_JEU_H
+#define FONCTIONS_JEU_H
+
+#include "Grille.h"
+
+void jouer_jeu_serpent_limite(Grille *grille, int delai);
+
+#endif
+
+
+Jeu_1_serpent :
+#include <ncurses.h>
+#include <stdlib.h>
+#include <time.h>
+#include "Jeu.h"
+
+void jouer_jeu_serpent_limite(Grille *grille, int delai) {
+    int ch;
+    unsigned int snake_x = grille->n / 2;
+    unsigned int snake_y = grille->m / 2;
+    srand(time(NULL));
+
+    initscr();
+    raw();
+    keypad(stdscr, TRUE);
+    noecho();
+    halfdelay(delai);
+
+    do {
+        Grille_vider(grille);
+        grille->tableau[snake_x][snake_y] = 'S';
+        grille->tableau[grille->fruit_x][grille->fruit_y] = 'F';
+
+        int rand_x = rand() % grille->n;
+        int rand_y = rand() % grille->m;
+        grille->tableau[rand_x][rand_y] = '*'; // Display random obstacles
+
+        Grille_redessiner(grille);
+
+        ch = getch();
+
+        switch (ch) {
+            case KEY_UP:
+                if (snake_x > 0) snake_x--;
+                break;
+            case KEY_DOWN:
+                if (snake_x < grille->n - 1) snake_x++;
+                break;
+            case KEY_LEFT:
+                if (snake_y > 0) snake_y--;
+                break;
+            case KEY_RIGHT:
+                if (snake_y < grille->m - 1) snake_y++;
+                break;
+        }
+
+        if (grille->tableau[snake_x][snake_y] == '*') {
+            // If the snake hits an obstacle, end the game
+            break;
+        } else if (grille->tableau[snake_x][snake_y] == 'F') {
+            // If the snake eats the fruit, increase its length and respawn the fruit
+            grille->fruit_x = rand() % grille->n;
+            grille->fruit_y = rand() % grille->m;
+            grille->tableau[grille->fruit_x][grille->fruit_y] = 'F';
+        }
+
+    } while (ch != 'q');
+
+    endwin();
+}
+
+
+main.c :
+#include <stdio.h>
+#include <stdlib.h>
+#include "Grille.h"
+#include "Jeu.h"
+
+int main(int argc, char *argv[]) {
+    if (argc < 4) {
+        printf("Usage: %s <n> <m> <delai>\n", argv[0]);
+        return 1;
+    }
+
+    unsigned int n = atoi(argv[1]);
+    unsigned int m = atoi(argv[2]);
+    int delai = atoi(argv[3]);
+
+    Grille *grille = Grille_allouer(n, m);
+    if (grille == NULL) {
+        printf("Failed to allocate memory for the grid.\n");
+        return 1;
+    }
+
+    jouer_jeu_serpent_limite(grille, delai);
+
+    Grille_desallouer(grille);
+
+    return 0;
+}
+
+
+
+serpent.h :
+#ifndef SERPENT_H
+#define SERPENT_H
+
+#include "Liste_section.h"
+
+struct Serpent {
+    int x_tete;
+    int y_tete;
+    struct liste_section corps;
+};
+
+struct Serpent *nouveau_serpent(int x, int y);
+void detruire_serpent(struct Serpent **serpent);
+
+#endif /* SERPENT_H */
+
+
+serpent.c :
+#include "serpent.h"
+#include<stdlib.h>
+#include<stdio.h>
+
+
+
+
+struct Serpent *nouveau_serpent(int x, int y) {
+    struct Serpent *serpent = malloc(sizeof(struct Serpent));
+    if (serpent == NULL) {
+        return NULL; // Memory allocation failed
+    }
+    serpent->x_tete = x;
+    serpent->y_tete = y;
+    serpent->corps = *nouvelle_liste_section(); // Dereference the pointer
+    return serpent;
+}
+
+// In serpent.c
+/*
+void detruire_serpent(struct Serpent **serpent) {
+    if (*serpent != NULL) {
+        detruire_liste_section(&(*serpent)->corps);
+        free(*serpent);
+        *serpent = NULL;
+    }
+}
+*/
+
+
+Liste_section.h :
+#ifndef LISTE_SECTION_H
+#define LISTE_SECTION_H
+
+struct maillon_section {
+    int nb_case;
+    int color;
+    struct maillon_section *suivant;
+};
+
+struct liste_section {
+    struct maillon_section *premier;
+    struct maillon_section *dernier;
+    int longueur;
+};
+
+struct maillon_section *nouveau_maillon_section(int nb_case, int color);
+void detruire_maillon_section(struct maillon_section **m);
+struct liste_section *nouvelle_liste_section();
+int est_vide_liste_section(const struct liste_section *l);
+int longueur_liste_section(const struct liste_section *l);
+void afficher_liste_section(const struct liste_section *l);
+void ajouter_maillon_debut_liste_section(struct liste_section *l, struct maillon_section *m);
+void ajouter_maillon_fin_liste_section(struct liste_section *l, struct maillon_section *m);
+struct maillon_section *extraire_maillon_debut_liste_section(struct liste_section *l);
+struct maillon_section *extraire_maillon_fin_liste_section(struct liste_section *l);
+void detruire_liste_section(struct liste_section **l);
+
+#endif /* LISTE_SECTION_H */
+
+
+Liste_section.c :
+#include "Liste_section.h"
+#include <stdlib.h>
+#include<stdio.h>
+
+struct maillon_section *nouveau_maillon_section(int nb_case, int color) {
+    struct maillon_section *m = malloc(sizeof(struct maillon_section));
+    if (m == NULL) {
+        return NULL; // Allocation failed
+    }
+    m->nb_case = nb_case;
+    m->color = color;
+    m->suivant = NULL;
+    return m;
+}
+
+void detruire_maillon_section(struct maillon_section **m) {
+    if (*m != NULL) {
+        free(*m);
+        *m = NULL;
+    }
+}
+
+struct liste_section *nouvelle_liste_section() {
+    struct liste_section *l = malloc(sizeof(struct liste_section));
+    if (l == NULL) {
+        return NULL; // Allocation failed
+    }
+    l->premier = NULL;
+    l->dernier = NULL;
+    l->longueur = 0;
+    return l;
+}
+
+int est_vide_liste_section(const struct liste_section *l) {
+    return (l->premier == NULL);
+}
+
+int longueur_liste_section(const struct liste_section *l) {
+    return l->longueur;
+}
+
+void afficher_liste_section(const struct liste_section *l) {
+    struct maillon_section *m;
+    for (m = l->premier; m != NULL; m = m->suivant) {
+        printf("Size: %d, Color: %d\n", m->nb_case, m->color);
+    }
+}
+
+void ajouter_maillon_debut_liste_section(struct liste_section *l, struct maillon_section *m) {
+    if (est_vide_liste_section(l)) {
+        l->dernier = m;
+    }
+    m->suivant = l->premier;
+    l->premier = m;
+    ++l->longueur;
+}
+
+void ajouter_maillon_fin_liste_section(struct liste_section *l, struct maillon_section *m) {
+    m->suivant = NULL;
+    if (est_vide_liste_section(l)) {
+        l->premier = m;
+    } else {
+        l->dernier->suivant = m;
+    }
+    l->dernier = m;
+    ++l->longueur;
+}
+
+struct maillon_section *extraire_maillon_debut_liste_section(struct liste_section *l) {
+    struct maillon_section *m = l->premier;
+    if (m != NULL) {
+        l->premier = m->suivant;
+        --l->longueur;
+        if (est_vide_liste_section(l)) {
+            l->dernier = NULL;
+        }
+        m->suivant = NULL;
+    }
+    return m;
+}
+
+struct maillon_section *extraire_maillon_fin_liste_section(struct liste_section *l) {
+    struct maillon_section *m = l->premier, *res;
+    if (m == NULL) {
+        return m;
+    }
+    --l->longueur;
+    if (m->suivant == NULL) {
+        l->premier = NULL;
+        l->dernier = NULL;
+        return m;
+    }
+    while (m->suivant->suivant != NULL) {
+        m = m->suivant;
+    }
+    l->dernier = m;
+    res = m->suivant;
+    m->suivant = NULL;
+    return res;
+}
+
+/*void detruire_liste_section(struct liste_section **l) {
+    if (*l != NULL) {
+        while (!est_vide_liste_section(*l)) {
+            struct maillon_section *m = extraire_maillon_debut_liste_section(*l);
+            detruire_maillon_section(&m);
+        }
+        free(*l);
+        *l = NULL;
+        
+    }
+}
+*/
+
+
+
